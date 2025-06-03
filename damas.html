@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Jogo de Damas com Doação Pix</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #f0f0f0;
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh;
+      justify-content: center;
+    }
+
+    /* Estilo do logo */
+    #logo {
+      font-size: 2em;
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    #board {
+      display: grid;
+      grid-template-columns: repeat(8, 60px);
+      grid-template-rows: repeat(8, 60px);
+      border: 4px solid #333;
+      margin-bottom: 30px;
+    }
+
+    .square {
+      width: 60px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .dark {
+      background-color: #8b4513;
+    }
+
+    .light {
+      background-color: #f5f5dc;
+    }
+
+    .piece {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+    }
+
+    .player {
+      background-color: red;
+    }
+
+    .ai {
+      background-color: black;
+    }
+
+    .selected {
+      outline: 3px solid yellow;
+    }
+
+    #pix-donation {
+      text-align: center;
+      font-family: sans-serif;
+      background: white;
+      padding: 15px 25px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      max-width: 300px;
+      user-select: none;
+    }
+
+    #pix-donation strong {
+      font-size: 1.3em;
+      cursor: pointer;
+      color: #0a7f0a;
+      user-select: text;
+    }
+
+    #pix-donation p {
+      margin: 10px 0 0 0;
+      color: #555;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Logo do jogo -->
+  <div id="logo">🎯 Jogo de Damas</div>
+
+  <div id="board"></div>
+
+  <div id="pix-donation">
+    <p>Ajude com uma doação via Pix:</p>
+    <p>Toque no número abaixo para copiar a chave Pix:</p>
+    <strong id="pix-key">06799172257</strong>
+    <p>(Copiar chave)</p>
+  </div>
+
+  <script>
+    const board = document.getElementById('board');
+    const squares = [];
+    const pieces = [];
+    let selectedPiece = null;
+    const boardSize = 8;
+
+    function createBoard() {
+      for (let row = 0; row < boardSize; row++) {
+        for (let col = 0; col < boardSize; col++) {
+          const square = document.createElement('div');
+          square.classList.add('square');
+          square.classList.add((row + col) % 2 === 0 ? 'light' : 'dark');
+          square.dataset.row = row;
+          square.dataset.col = col;
+          board.appendChild(square);
+          squares.push(square);
+        }
+      }
+    }
+
+    function placePieces() {
+      squares.forEach(square => {
+        const row = parseInt(square.dataset.row);
+        const col = parseInt(square.dataset.col);
+
+        if ((row + col) % 2 === 1 && row < 3) {
+          addPiece(square, 'ai');
+        }
+
+        if ((row + col) % 2 === 1 && row > 4) {
+          addPiece(square, 'player');
+        }
+      });
+    }
+
+    function addPiece(square, type) {
+      const piece = document.createElement('div');
+      piece.classList.add('piece', type);
+      piece.dataset.type = type;
+      piece.dataset.row = square.dataset.row;
+      piece.dataset.col = square.dataset.col;
+      piece.addEventListener('click', onPieceClick);
+      square.appendChild(piece);
+      pieces.push(piece);
+    }
+
+    function onPieceClick(e) {
+      const piece = e.target;
+      if (piece.dataset.type !== 'player') return;
+      if (selectedPiece) selectedPiece.classList.remove('selected');
+      selectedPiece = piece;
+      piece.classList.add('selected');
+    }
+
+    board.addEventListener('click', (e) => {
+      const square = e.target.classList.contains('square') ? e.target : e.target.parentElement;
+      if (!square || !selectedPiece) return;
+
+      const fromRow = parseInt(selectedPiece.dataset.row);
+      const fromCol = parseInt(selectedPiece.dataset.col);
+      const toRow = parseInt(square.dataset.row);
+      const toCol = parseInt(square.dataset.col);
+      const rowDiff = toRow - fromRow;
+      const colDiff = toCol - fromCol;
+
+      const isSimpleMove = Math.abs(rowDiff) === 1 && Math.abs(colDiff) === 1 &&
+                           !square.querySelector('.piece') && toRow < fromRow;
+
+      const isCaptureMove = Math.abs(rowDiff) === 2 && Math.abs(colDiff) === 2 &&
+                            !square.querySelector('.piece');
+
+      if (isSimpleMove) {
+        movePiece(selectedPiece, square, toRow, toCol);
+        return setTimeout(() => aiMove(), 500);
+      }
+
+      if (isCaptureMove) {
+        const midRow = fromRow + rowDiff / 2;
+        const midCol = fromCol + colDiff / 2;
+        const midSquare = getSquare(midRow, midCol);
+        const capturedPiece = midSquare.querySelector('.piece');
+
+        if (capturedPiece && capturedPiece.dataset.type === 'ai') {
+          midSquare.removeChild(capturedPiece);
+          const idx = pieces.indexOf(capturedPiece);
+          if (idx !== -1) pieces.splice(idx, 1);
+
+          movePiece(selectedPiece, square, toRow, toCol);
+          return setTimeout(() => aiMove(), 500);
+        }
+      }
+    });
+
+    function movePiece(piece, square, toRow, toCol) {
+      square.appendChild(piece);
+      piece.dataset.row = toRow;
+      piece.dataset.col = toCol;
+      piece.classList.remove('selected');
+      selectedPiece = null;
+    }
+
+    function aiMove() {
+      const aiPieces = pieces.filter(p => p.dataset.type === 'ai');
+      const validMoves = [];
+
+      aiPieces.forEach(piece => {
+        const row = parseInt(piece.dataset.row);
+        const col = parseInt(piece.dataset.col);
+        const moveOptions = [
+          { dr: 1, dc: -1 },
+          { dr: 1, dc: 1 },
+        ];
+
+        moveOptions.forEach(opt => {
+          const newRow = row + opt.dr;
+          const newCol = col + opt.dc;
+          const square = getSquare(newRow, newCol);
+          if (square && !square.querySelector('.piece')) {
+            validMoves.push({ piece, square, toRow: newRow, toCol: newCol });
+          }
+        });
+      });
+
+      if (validMoves.length > 0) {
+        const move = validMoves[Math.floor(Math.random() * validMoves.length)];
+        move.square.appendChild(move.piece);
+        move.piece.dataset.row = move.toRow;
+        move.piece.dataset.col = move.toCol;
+      }
+    }
+
+    function getSquare(row, col) {
+      return squares.find(s => parseInt(s.dataset.row) === row && parseInt(s.dataset.col) === col);
+    }
+
+    createBoard();
+    placePieces();
+
+    const pixKey = document.getElementById('pix-key');
+    pixKey.addEventListener('click', () => {
+      navigator.clipboard.writeText(pixKey.textContent)
+        .then(() => alert('Chave Pix copiada!'))
+        .catch(() => alert('Erro ao copiar, copie manualmente.'));
+    });
+  </script>
+
+</body>
+</html>
